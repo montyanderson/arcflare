@@ -1,81 +1,72 @@
 # Arc News Workers
 
-A TypeScript port of the core `news.arc` application to Cloudflare Workers and D1. The Worker uses standard Fetch and Web Crypto APIs. No Node compatibility flag, Scheme process, filesystem, external database, or client-side JavaScript is required at runtime.
+Runs the **official Arc 3.2 `news.arc` source** on Cloudflare Workers. The original application executes in the [Rainbow.js Arc VM](https://github.com/arclanguage/rainbow-js). A SQLite-backed Durable Object supplies persistent files and serializes requests. Runtime code uses Workers APIs and Web Crypto, without a Scheme process, Node compatibility flag, external server, or JavaScript `eval`.
 
-Based on the [official Arc 3.2 distribution](http://www.arclanguage.org/arc3.2.tar), with its complete, unmodified contents in `upstream/`. This is a functional port, not an Arc interpreter or a complete behavior-compatible replacement for the original application.
+The complete [official archive](http://www.arclanguage.org/arc3.2.tar) is preserved unchanged under `upstream/`. Its Arc libraries, news application, and static assets are bundled into the Worker. Platform adaptations live separately in `native/workers.arc` and the JavaScript host. This replaces the earlier partial TypeScript/D1 rewrite in this repository.
 
-Archive SHA256: `5bda6cd1e080ce7e6998665a60e9086d6e21275315c12bc4182c1ab5dfa63dda`. [upstream/SOURCE.json](upstream/SOURCE.json) records each original file's SHA256. The initial implementation used an older public Arc 3 mirror; the reference source and the behavior listed below have now been updated against the official 3.2 release.
+## Run
 
-## Run locally
-
-Requires Node.js 22.12+ and pnpm. Dependencies and their build permissions are pinned in the lockfile and `pnpm-workspace.yaml`.
+Requires Node.js 22.13+ and pnpm.
 
 ```sh
 pnpm install
-pnpm db:migrate
 pnpm dev
 ```
 
-The development server binds to `0.0.0.0:8787`. On travis, open **http://travis.adn:8787**. The local database persists under `.wrangler/state/`; it is excluded from Git. No sample accounts or passwords are installed.
+Open **http://travis.adn:8787** on travis, or `http://localhost:8787` on another machine. Wrangler binds to `0.0.0.0:8787`. Data persists in `.wrangler/state/`. The Durable Object creates its SQLite schema automatically.
 
-Create your account through `/login`, then explicitly grant it administrator access:
+Use the front page's **login** link to create an account. To make your existing account an administrator, add this to an untracked `.dev.vars` file, then restart:
 
-```sh
-pnpm exec wrangler d1 execute DB --local --command "UPDATE users SET role='admin' WHERE id='your_username'"
+```dotenv
+ADMIN_USERS=your_username
 ```
 
-The first person to register does not automatically become an administrator. Editors can review flags and kill/restore items. Administrators can also ban/unban users. Roles can be assigned with D1 SQL.
+Register the account before granting it administrator access. The first account is not automatically an administrator. `ADMIN_USERS` accepts comma-separated names and replaces the administrator list when a runtime starts; an empty value clears it. If omitted, the stored list is retained. Administrators have the original `/newsadmin`, `/prompt`, and `/repl` pages, including the ability to execute Arc code.
 
-## Deploy to your Cloudflare account
+Set `SITE_NAME` in `wrangler.jsonc` to change the title.
+
+## Deploy
 
 ```sh
 pnpm exec wrangler login
-pnpm exec wrangler d1 create arc-news
-```
-
-Replace the all-zero `database_id` in `wrangler.jsonc` with the returned ID. Set `SITE_NAME` and `SITE_DESCRIPTION`, then run:
-
-```sh
-pnpm exec wrangler d1 migrations apply DB --remote
 pnpm deploy
 ```
 
-Register your production account and run the administrator SQL above with `--remote`. The hourly cron deletes expired sessions and rate-limit entries. An authenticated Cloudflare account with Workers and D1 permissions is required. No production database has been created and no Cloudflare deployment has been performed by this project setup.
+Wrangler creates the SQLite-backed Durable Object namespace using the checked-in migration. No D1 database or database ID is needed. Register your production account, add its username to `vars.ADMIN_USERS` in `wrangler.jsonc`, then deploy again. Configuration changes apply when the runtime restarts.
 
-## Implemented
+Deployment requires your Cloudflare account. This repository has been built and tested locally; it has not been deployed to Cloudflare.
 
-- Ranked front page, newest, best, active discussions, ask/show filters, polls, recent/best comments, per-user submissions and comments, leaders, and RSS. Arc 3.2's `/noobstories` and `/noobcomments` list items submitted while the author's account was less than two days old, regardless of the account's current age.
-- Link/text submissions, normalized duplicate URLs, nested replies, paragraph/italic/code formatting, two-hour author editing, and deletion that preserves replies.
-- Upvotes, undoing votes, comment downvotes above 200 karma, atomic score/karma changes, one poll choice per user, private saved items, and flags. Downvotes cannot target replies to the voter's own item. As in Arc 3.2, the downvote arrow disappears after 24 hours except for administrators; the direct vote handler itself does not enforce that display window.
-- Registration/login, private profile email, password changes, session expiry/revocation, administrator bans, moderation queues, and an action log.
-- Server-rendered responsive HTML, accessible form labels, POST-only mutations, origin/CSRF checks, escaped content, restrictive CSP, request-size limits, and database-backed rate limits.
+## What runs
 
-## Porting decisions and limits
+The original application supplies its routes, HTML, Arc macros, forms, closure URLs, rankings, threaded comments, voting, polls, profiles, formatting, RSS, moderation, abuse heuristics, preferences, and administrator tools. These are loaded from the official source. Original behavior includes multiple poll-option votes and GET-based action links.
 
-| Original Arc implementation | Worker implementation |
+| Platform facility | Worker adapter |
 | --- | --- |
-| `srv.arc` socket server and closure URLs | ES module `fetch` handler and explicit routes |
-| Files under `arc/news/` | D1 relational tables, indexes, constraints and transactions |
-| Process-wide item/profile/vote tables | Per-request D1 reads; no durable state in isolate globals |
-| Random background re-ranking | Recompute on each front-page read across the latest 1,000 stories |
-| `frontpage-rank` | Original score exponent `.8`, gravity `1.8`, 120-minute base, text `.4`, Arc 3.2 comment `.5`, image/dead-item and controversy penalties; controversy includes the story itself in the visible family count |
-| `display-subcomments` | Order sibling comments by their age-adjusted Arc rank |
-| In-process login/session state | Salted PBKDF2-SHA256 passwords; random sessions stored as SHA256 hashes |
-| Background cleanup | Workers scheduled handler |
+| Scheme Arc runtime | Rainbow.js interpreter and bytecode VM, scoped to each object instance |
+| Socket accept loop | Worker `fetch` calls the original `respond` function |
+| Files under `arc/` | Ordered SQLite text chunks; all request writes commit together |
+| Shared tables and closures | One named Durable Object per site; an explicit queue prevents request interleaving during asynchronous crypto |
+| Background ranking and averages | Original `defbg` functions invoked when due, on requests and a 30-second alarm |
+| OpenSSL password subprocess | Salted PBKDF2-SHA256 via Web Crypto, with legacy SHA1 verification |
+| Random bytes | `crypto.getRandomValues`, including the original `/dev/urandom` reader |
+| Static files | Original images and `robots.txt` served by the outer Worker |
 
-This release deliberately differs from Arc in several areas:
+The bridge implements Arc 3.2 string interpolation and corrects Rainbow's file/directory existence adapters. The admin status bar omits process-memory usage because Workers does not expose it. New password records use 100,000 PBKDF2 iterations; existing SHA1 records remain unchanged until the password is set again.
 
-- It does not run arbitrary Arc code or preserve REPL hooks, server administration pages, IP/domain ban lists, word-scrubbing rules, sockpuppet scoring, voting-bias heuristics, automatic flag killing, delayed comments, or anti-procrastination settings.
-- Arc 3.2 also changes automatic flag killing and low-karma abuse handling. Those systems remain outside this port. Domain/key-based lightweight classifications and the full original visibility rules are not implemented. Flagging, moderation permissions, undoing votes, poll restrictions, and other behavior still differ from Arc; the 3.2 comparison does not establish full compatibility.
-- It does not import an existing Arc data directory or migrate legacy password hashes. Start with a new database; do not replace a live Arc installation without a separate data migration.
-- Email is private profile metadata only; outbound mail, address verification and forgotten-password recovery are not implemented. Password changes require the current password.
-- Comment rendering is limited to 500 descendants and 20 visible nesting levels per view, with links to continue subthreads. The recursive query caps depth at 64. Listings paginate 30 items at a time. Ranking/best/active consider the latest 1,000 stories.
-- Code/italics/paragraphs are supported; automatic linkification, some Arc formatting rules, custom colors, and user display preferences are not ported.
-- PBKDF2 uses 100,000 iterations, compatible with the tested Workers Web Crypto runtime. Authentication CPU cost must be evaluated against your selected Workers plan before exposing registration at scale. Rate limits are basic per-IP/per-account limits, not the original abuse detection system.
-- Session cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` on HTTPS. Local HTTP preview omits `Secure`. All form POSTs require a matching `Origin`; authenticated forms also require a CSRF token. API clients must supply both.
-- No shared HTTP cache is used. Personalized pages are marked `no-store`.
+Cookies use `HttpOnly`, `SameSite=Lax`, and `Secure` on HTTPS. POST requests require a matching `Origin`. Cross-site browser requests to closure actions, voting, and the administrator REPL are rejected using Fetch Metadata. Forms have a 64 KiB request limit. Personalized responses are not HTTP-cached. Arc's original cookie lifetime, password-length policy, and account logic otherwise remain in effect.
 
-## Verification
+## Operational limits
+
+- **Open forms and closure links expire on a cold restart or object eviction.** Arc stores callbacks in memory. Reload the page to obtain a new callback. Accounts, cookies, posts, comments, profiles, votes, and other saved Arc files persist. Unsaved REPL changes and request-rate counters do not persist.
+- A single object owns the site. Original Arc tables are loaded into its memory, and requests run sequentially. Large sites must be measured against Workers memory, CPU, and storage limits; this port does not add sharding. Cold starts compile the Arc libraries and load saved items.
+- The 30-second alarm continues after the first request, running the original maintenance functions. This generates ongoing Durable Object activity.
+- General OS subprocesses, sockets, native threads, and process/GC metrics are unavailable. Directory creation and temporary-file cleanup are adapted. Administrator programs that depend on other OS facilities need additional adapters.
+- This runs historical Arc 3.2, not today's Hacker News. Original behavior and bugs are retained except for the documented platform adaptations. The tested flows below establish practical compatibility, not complete runtime equivalence.
+- Existing Arc data uses the same text representation inside SQLite, and legacy password verification is supported. An import/export tool is not included. The earlier D1 rewrite's data is not automatically migrated.
+
+See Cloudflare's [Durable Object limits](https://developers.cloudflare.com/durable-objects/platform/limits/) and [SQLite storage API](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/) for platform constraints.
+
+## Verify
 
 ```sh
 pnpm check
@@ -83,12 +74,20 @@ pnpm test
 pnpm build
 ```
 
-Tests run the actual bundled Worker in workerd/Miniflare with D1, rather than mocking the database. They cover accounts and cookies, CSRF, submission, concurrent voting, nested replies, authorization, polls, moderation, private profile data, password/session revocation, pagination, rate limits, deleted-thread rendering, and the Arc 3.2 ranking formula. Regression tests cover the strict downvote threshold and reply restriction, arrow expiry, new-account listing boundaries, controversy family size, and comment ordering.
+`check` verifies every official file against its recorded SHA256, verifies the vendored VM, and checks JavaScript syntax. `test` runs the bundled Worker in workerd/Miniflare with real SQLite Durable Object storage. It exercises original forms for registration, submission, comments, nested replies, voting, profile editing, polls, moderation, and the administrator REPL. It also checks restart persistence, expired callbacks, private profile data, static assets, and request validation.
 
-The test runtime is pinned to the Miniflare version bundled with the pinned Wrangler release, including its v4 options adapter. Test data is isolated from the local preview database. The build command creates a deployable Worker bundle without deploying it.
+Runtime tests cover macros, closures, continuations, interpolation, background jobs, Unicode serialization, password compatibility, and independent VM state. Storage tests cover chunk boundaries and staged writes.
 
-## Source layout
+`build` produces a deployable bundle in `dist/` without deploying it. Generated modules under `native/generated/` are rebuilt from checked-in inputs and excluded from Git.
 
-`src/index.ts` handles HTTP and scheduled events. `auth.ts` handles identity, forms, and rate limits. `actions.ts` contains mutations; `pages.ts` contains reads; `html.ts` renders HTML; `ranking.ts` contains the ranking formula; `voting.ts` holds downvote eligibility. `migrations/0001_news.sql` defines the database and voting triggers. Files in `upstream/` are reference material and are not bundled into the Worker.
+## Source
 
-Licensed under Artistic-2.0. Original copyright and modification notes are in `NOTICE` and `upstream/copyright`.
+- `upstream/`: unmodified official Arc 3.2 distribution; checksums in `SOURCE.json`.
+- `vendor/rainbow/`: pinned JavaScript VM, attribution, and checksums.
+- `native/worker.js`: HTTP adapter, Durable Object lifecycle, request queue, alarms.
+- `native/engine.js`, `host.js`, `runtime-bridge.js`: initialization, virtual filesystem, VM bindings.
+- `native/workers.arc`: platform overrides loaded after the official libraries.
+- `native/storage.js`, `passwords.js`: SQLite files and Web Crypto passwords.
+- `scripts/build-native.mjs`: bundles the original source and VM.
+
+Licensed under Artistic-2.0. See `LICENSE`, `NOTICE`, `upstream/copyright`, and `vendor/rainbow/LICENSE.md`.

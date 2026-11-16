@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/arclanguage/rainbow-js",
+  "commit": "483866c2d0a9fcded81cff8f9262a19d79e2656f",
+  "source_path": "src/rainbow.js",
+  "files_sha256": {
+    "rainbow.js": "7c131863f1241fff0c8b9e96d5ca93dfc2083a8c93a6b05de23b8098befe9a07",
+    "LICENSE.md": "b12a0252c0369e04ab6d7b62ef9c26ece612fe3c8e02df865920ceb4780d15c7",
+    "AUTHORS.md": "c2760ed6dda7488b5f7322022faed11058bf9018412f1a766e67280e8200e1fc"
+  }
+}

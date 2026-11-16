@@ -1,18 +1,26 @@
-Arc News Workers is a modified version of the Arc news application, translated
-to TypeScript for Cloudflare Workers. It is distributed under Artistic-2.0.
+Arc News Workers is a modified distribution of the Arc news application for
+Cloudflare Workers, distributed under Artistic-2.0.
 
-Original software: copyright (c) Paul Graham and Robert Morris.
+Original Arc software: copyright (c) Paul Graham and Robert Morris.
 Source: official Arc 3.2 distribution, http://www.arclanguage.org/arc3.2.tar
 Archive SHA256: 5bda6cd1e080ce7e6998665a60e9086d6e21275315c12bc4182c1ab5dfa63dda
 The complete unmodified archive contents are included in upstream/.
 upstream/SOURCE.json records the archive and individual file checksums.
 
-This modified version was created on 2026-11-16 and updated against the official
-Arc 3.2 distribution. The initial version referenced an older public Arc 3
-mirror; the official archive now supplies the reference source and behavior.
-It replaces the Arc/Scheme
-runtime, filesystem persistence, HTTP server, login implementation, and closure
-URLs with TypeScript, D1, Web Crypto, and explicit HTTP handlers. It does not
-claim compatibility with every Arc feature or with the current Hacker News
-production service. It uses a different name to distinguish it from the
-Standard Version. See README.md for supported behavior and differences.
+Rainbow.js: copyright (c) the Rainbow.js authors, including Rocketnia;
+derived from Rainbow, copyright (c) 2008-2010 Conan Dalton.
+Source: https://github.com/arclanguage/rainbow-js
+Commit: 483866c2d0a9fcded81cff8f9262a19d79e2656f
+See vendor/rainbow/AUTHORS.md, LICENSE.md, and SOURCE.json.
+
+This modified distribution, created on 2026-11-16, executes the original Arc
+libraries in the Rainbow.js VM. Separate host adapters replace the Scheme
+host, socket server, disk filesystem, OS background threads, random device,
+and password subprocess with Workers APIs, SQLite Durable Object storage,
+alarms, and Web Crypto. Compatibility bindings and Arc platform overrides
+are in native/. The official Arc files and vendored VM source are preserved.
+
+This supersedes the repository's initial partial TypeScript/D1 rewrite.
+It uses a different name to distinguish it from the Standard Version and
+does not claim full Arc runtime equivalence or equivalence with the current
+Hacker News production service. See README.md for behavior and limitations.

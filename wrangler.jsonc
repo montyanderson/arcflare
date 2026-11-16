@@ -1,17 +1,28 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "arc-news-workers",
-  "main": "src/index.ts",
+  "main": "native/worker.js",
   "compatibility_date": "2026-11-16",
-  "vars": {
-    "SITE_NAME": "Arc News",
-    "SITE_DESCRIPTION": "A community for curious people."
+  "build": {
+    "command": "node scripts/build-native.mjs"
   },
-  "d1_databases": [{
-    "binding": "DB",
-    "database_name": "arc-news",
-    "database_id": "00000000-0000-0000-0000-000000000000",
-    "migrations_dir": "migrations"
-  }],
-  "triggers": { "crons": ["0 * * * *"] }
+  "vars": {
+    "SITE_NAME": "Arc News"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NEWS",
+        "class_name": "ArcNews"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "ArcNews"
+      ]
+    }
+  ]
 }
