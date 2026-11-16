@@ -106,8 +106,14 @@ test('nested comments preserve parents, escape HTML and count descendants',async
 });
 test('only eligible high-karma users can downvote comments',async()=>{
   assert.equal((await post('/vote',{id:comment,dir:'down'},alice)).status,403);
-  await db.prepare("UPDATE users SET karma=500 WHERE id='alice'").run();
-  assert.equal((await post('/vote',{id:comment,dir:'down'},alice)).status,303);
+  await db.prepare("UPDATE users SET karma=201 WHERE id='alice'").run();
+  assert.equal((await post('/vote',{id:comment,dir:'down'},alice)).status,403);
+  assert.ok(!(await (await get(`/item?id=${comment}`,alice)).text()).includes('>downvote</button>'));
+  await db.prepare("UPDATE users SET karma=200 WHERE id='moderator'").run();
+  assert.equal((await post('/vote',{id:comment,dir:'down'},admin)).status,403);
+  await db.prepare("UPDATE users SET karma=201 WHERE id='moderator'").run();
+  assert.match(await (await get(`/item?id=${comment}`,admin)).text(),/>downvote<\/button>/);
+  assert.equal((await post('/vote',{id:comment,dir:'down'},admin)).status,303);
   assert.equal((await db.prepare('SELECT score FROM items WHERE id=?').bind(comment).first()).score,0);
   assert.equal((await post('/vote',{id:story,dir:'down'},bob)).status,403);
 });
@@ -178,6 +184,44 @@ test('newest pagination has no overlaps and includes every submitted row',async(
   assert.equal(titles(second).length,5);
   assert.equal(new Set([...titles(first),...titles(second)]).size,35);
   assert.match(first,/newest\?p=2/);
+});
+test('Arc 3.2 new-account lists use account age at submission, with a strict two-day cutoff',async()=>{
+  const created=(await db.prepare("SELECT created FROM users WHERE id='alice'").first()).created;
+  const rows=[];
+  for(const type of ['story','comment']) {
+    for(const [label,age] of [['inside',172799],['boundary',172800]]) {
+      const marker=`noob-${type}-${label}`;
+      const row=await db.prepare('INSERT INTO items(type,by,time,title,text,parent,root) VALUES (?,?,?,?,?,?,?) RETURNING id')
+        .bind(type,'alice',created+age,marker,marker,type==='comment'?story:null,type==='comment'?story:null).first();
+      rows.push(row.id);
+    }
+  }
+  // Moving both account and item timestamps back proves this is not a filter
+  // for accounts that happen to be new at the time the page is requested.
+  await db.prepare("UPDATE users SET created=created-864000 WHERE id='alice'").run();
+  for(const row of rows) await db.prepare('UPDATE items SET time=time-864000 WHERE id=?').bind(row).run();
+  for(const [path,type] of [['/noobstories','story'],['/noobcomments','comment']]) {
+    const response=await get(path);
+    assert.equal(response.status,200);
+    const html=await response.text();
+    assert.match(html,new RegExp(`noob-${type}-inside`));
+    assert.ok(!html.includes(`noob-${type}-boundary`));
+  }
+  const lists=await (await get('/lists')).text();
+  assert.match(lists,/href="\/noobstories"/);assert.match(lists,/href="\/noobcomments"/);
+  await db.prepare("UPDATE users SET created=? WHERE id='alice'").bind(created).run();
+  for(const row of rows) await db.prepare('DELETE FROM items WHERE id=?').bind(row).run();
+});
+test('comment trees use Arc rank rather than raw scores',async()=>{
+  const rows=[];
+  for(const [text,score,age] of [['older high score',20,86400],['newer relevant reply',3,60]]) {
+    const row=await db.prepare("INSERT INTO items(type,by,time,text,parent,root,score) VALUES ('comment','bob',unixepoch()-?,?,?,?,?) RETURNING id")
+      .bind(age,text,story,story,score).first();
+    rows.push(row.id);
+  }
+  const html=await (await get(`/item?id=${story}`)).text();
+  assert.ok(html.indexOf('newer relevant reply')<html.indexOf('older high score'));
+  for(const row of rows) await db.prepare('DELETE FROM items WHERE id=?').bind(row).run();
 });
 test('expired sessions and rate-limited mutations are rejected',async()=>{
   const login=await post('/login',{username:'alice',password:'a long test password'});

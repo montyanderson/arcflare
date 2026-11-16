@@ -11,7 +11,7 @@ export interface Item {
   id: number; type: 'story' | 'comment' | 'poll' | 'pollopt'; by: string;
   time: number; title: string; url: string; text: string; parent: number | null;
   root: number | null; score: number; dead: number; deleted: number;
-  comments?: number; voted?: number; saved?: number; flags?: number;
+  comments?: number; voted?: number; saved?: number; flags?: number; parent_by?: string;
 }
 export interface Context { env: Env; request: Request; url: URL; user: User | null; csrf: string; }
 export class HttpError extends Error {

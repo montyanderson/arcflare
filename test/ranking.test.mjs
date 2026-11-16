@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 await build({entryPoints:['src/ranking.ts'],bundle:true,format:'esm',outfile:'dist/test-ranking.mjs'});
 const {rank} = await import('../dist/test-ranking.mjs');
 const t=1800000000;
-const story={score:10,time:t-3600,url:'https://example.com/article',comments:0};
+const story={type:'story',score:10,time:t-3600,url:'https://example.com/article',comments:0};
 test('ranking matches the Arc gravity, score exponent and text penalty',()=>{
   assert.ok(Math.abs(rank(story,t)-(9**.8/3**1.8))<1e-12);
   assert.ok(Math.abs(rank({...story,url:''},t)-rank(story,t)*.4)<1e-12);
@@ -13,6 +13,17 @@ test('ranking matches the Arc gravity, score exponent and text penalty',()=>{
   assert.equal(rank({...story,score:1},t),0);
 });
 test('controversy and image penalties match the original ranking rules',()=>{
-  assert.equal(rank({...story,comments:100},t),rank(story,t)*.01);
+  assert.equal(rank({...story,comments:99},t),rank(story,t)*.01);
+  assert.equal(rank({...story,comments:19},t),rank(story,t));
+  assert.equal(rank({...story,comments:20},t),rank(story,t)*(10/21)**2);
   assert.equal(rank({...story,url:'https://example.com/a.jpg'},t),rank(story,t)*.3);
+  assert.equal(rank({...story,url:'https://example.com/a.jpg?v=1'},t),rank(story,t));
+  assert.equal(rank({...story,dead:1},t),rank(story,t)*.3);
+});
+test('Arc 3.2 applies the .5 comment factor before story-only penalties',()=>{
+  assert.equal(rank({...story,type:'comment',url:'',comments:100},t),rank(story,t)*.5);
+  assert.equal(rank({...story,type:'pollopt',url:''},t),rank(story,t)*.5);
+  const recent={...story,type:'comment',url:'',score:3,time:t-60};
+  const old={...story,type:'comment',url:'',score:20,time:t-86400};
+  assert.ok(rank(recent,t)>rank(old,t));
 });

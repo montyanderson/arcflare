@@ -18,11 +18,12 @@ export async function read(ctx: Context): Promise<Response> {
       (!rows.length?'<p>No items yet. '+link('Submit the first story.','/submit')+'</p>':'')+
       (hasMore?`<p>${link('More',`${path}?${query}`)}</p>`:''));
   };
-  if (['/','/news','/newest','/best','/ask','/show','/polls','/active'].includes(path)) {
+  if (['/','/news','/newest','/best','/ask','/show','/polls','/active','/noobstories'].includes(path)) {
     let where = storyTypes;
     if (path==='/ask') where += " AND (i.title LIKE 'Ask HN:%' OR i.url='')";
     if (path==='/show') where += " AND i.title LIKE 'Show HN:%'";
     if (path==='/polls') where += " AND i.type='poll'";
+    if (path==='/noobstories') where += ' AND i.time-(SELECT created FROM users WHERE id=i.by)<172800';
     if (['/','/news','/best','/active'].includes(path)) {
       let rows = await items(ctx,where,[],'i.id DESC',1000);
       if (path==='/best') rows.sort((a,b)=>b.score-a.score||b.id-a.id);
@@ -37,12 +38,13 @@ export async function read(ctx: Context): Promise<Response> {
     const rows = await items(ctx,where,[],'i.id DESC',31,offset);
     return paginated(path.slice(1),rows.slice(0,30),rows.length>30);
   }
-  if (['/newcomments','/bestcomments','/submitted','/threads','/saved'].includes(path)) {
+  if (['/newcomments','/bestcomments','/submitted','/threads','/saved','/noobcomments'].includes(path)) {
     let where = 'i.dead=0 AND i.deleted=0';
     const values: string[] = [];
     if (path==='/saved') { values.push(requireUser(ctx).id); where += ' AND EXISTS (SELECT 1 FROM saved WHERE item_id=i.id AND user_id=?)'; }
     else if (path==='/submitted' || path==='/threads') { where += ` AND i.by=? AND ${path==='/submitted'?"i.type IN ('story','poll')":"i.type='comment'"}`; values.push(param('id')||requireUser(ctx).id); }
     else where += " AND i.type='comment'";
+    if (path==='/noobcomments') where += ' AND i.time-(SELECT created FROM users WHERE id=i.by)<172800';
     const rows = await items(ctx,where,values,path==='/bestcomments'?'i.score DESC, i.id DESC':'i.id DESC',31,offset);
     return paginated(path.slice(1),rows.slice(0,30),rows.length>30);
   }
@@ -72,7 +74,7 @@ export async function read(ctx: Context): Promise<Response> {
     const byParent = new Map<number,Item[]>();
     for (const comment of comments) { const siblings = byParent.get(comment.parent!)||[]; siblings.push(comment); byParent.set(comment.parent!,siblings); }
     const render = (parent: number, depth: number): string => {
-      const children = (byParent.get(parent)||[]).sort((a,b)=>b.score-a.score||a.id-b.id);
+      const children = (byParent.get(parent)||[]).sort((a,b)=>rank(b)-rank(a)||a.id-b.id);
       return children.map(child=>`<section id="comment-${child.id}">${itemHtml(ctx,child)}${depth<20?`<div class="replies">${render(child.id,depth+1)}</div>`:(byParent.has(child.id)?`<p>${link('Continue thread',`/item?id=${child.id}`)}</p>`:'')}</section>`).join('');
     };
     body += render(row.id,0);
@@ -111,7 +113,7 @@ export async function read(ctx: Context): Promise<Response> {
     const audit = await db.prepare('SELECT * FROM moderation ORDER BY id DESC LIMIT 50').all<{actor:string;action:string;target:string;time:number}>();
     return page(ctx,'Moderation',`<h1>Moderation</h1><p>${link('flagged','/flagged')} | ${link('killed','/killed')}</p>`+rows.map(row=>`<p>${row.flags} flags</p>${itemHtml(ctx,row)}`).join('')+'<h2>Recent actions</h2>'+audit.results.map(r=>`<p>${escape(r.actor)}: ${escape(r.action)} ${escape(r.target)} — ${escape(age(r.time))}</p>`).join(''));
   }
-  if (path==='/lists') return page(ctx,'Lists','<h1>Lists</h1>'+['newest','best','active','newcomments','bestcomments','polls','leaders'].map(route=>`<p>${link(route,'/'+route)}</p>`).join(''));
+  if (path==='/lists') return page(ctx,'Lists','<h1>Lists</h1>'+['newest','best','active','newcomments','bestcomments','noobstories','noobcomments','polls','leaders'].map(route=>`<p>${link(route,'/'+route)}</p>`).join(''));
   if (path==='/formatdoc') return page(ctx,'Formatting','<p>Blank lines separate paragraphs. Surround text with *asterisks* for italics. Start a paragraph with two spaces for code. HTML is displayed as text.</p>');
   if (path==='/welcome') return page(ctx,'Welcome',`<h1>Welcome</h1><p>${escape(ctx.env.SITE_DESCRIPTION||'Share interesting links and thoughtful comments.')}</p>`);
   if (path==='/rss') {

@@ -2,11 +2,15 @@ Arc News Workers is a modified version of the Arc news application, translated
 to TypeScript for Cloudflare Workers. It is distributed under Artistic-2.0.
 
 Original software: copyright (c) Paul Graham and Robert Morris.
-Source: https://github.com/wting/hackernews
-Original news.arc blob: d21f6676ee8921a0dad57aa86c2179197c15d4bd
-An unmodified reference copy is included in upstream/news.arc.
+Source: official Arc 3.2 distribution, http://www.arclanguage.org/arc3.2.tar
+Archive SHA256: 5bda6cd1e080ce7e6998665a60e9086d6e21275315c12bc4182c1ab5dfa63dda
+The complete unmodified archive contents are included in upstream/.
+upstream/SOURCE.json records the archive and individual file checksums.
 
-This modified version was created on 2026-11-16. It replaces the Arc/Scheme
+This modified version was created on 2026-11-16 and updated against the official
+Arc 3.2 distribution. The initial version referenced an older public Arc 3
+mirror; the official archive now supplies the reference source and behavior.
+It replaces the Arc/Scheme
 runtime, filesystem persistence, HTTP server, login implementation, and closure
 URLs with TypeScript, D1, Web Crypto, and explicit HTTP handlers. It does not
 claim compatibility with every Arc feature or with the current Hacker News

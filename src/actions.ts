@@ -1,6 +1,7 @@
 import { Context, HttpError, User, editor, now } from './types';
 import { cookie, digest, form, passwordHash, passwordMatches, rate, requireUser, session } from './auth';
 import { canEdit, cleanUrl, id, item, live, validateText } from './db';
+import { canDownvote } from './voting';
 
 export function redirect(path = '/', headers: HeadersInit = {}) {
   const h = new Headers(headers);
@@ -113,7 +114,7 @@ export async function mutate(ctx: Context): Promise<Response> {
       await db.prepare('DELETE FROM votes WHERE user_id=? AND item_id=?').bind(user.id,row.id).run();
     } else {
       if (row.by===user.id && row.type!=='pollopt') throw new HttpError(400,'You cannot vote for yourself.');
-      if (direction==='down' && (row.type!=='comment' || user.karma<500 || row.score<=-4)) throw new HttpError(403,'Downvoting requires 500 karma and an eligible comment.');
+      if (direction==='down' && !canDownvote(user,row)) throw new HttpError(403,'Downvoting requires more than 200 karma and an eligible comment that is not a reply to your own post.');
       await rate(ctx.env,`vote:${user.id}`,120,3600);
       if (row.type==='pollopt') {
         if (!live(await item(ctx,row.parent!))) throw new HttpError(400,'Voting is closed.');

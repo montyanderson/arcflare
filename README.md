@@ -2,7 +2,9 @@
 
 A TypeScript port of the core `news.arc` application to Cloudflare Workers and D1. The Worker uses standard Fetch and Web Crypto APIs. No Node compatibility flag, Scheme process, filesystem, external database, or client-side JavaScript is required at runtime.
 
-Based on the [public Arc 3 news source](https://github.com/wting/hackernews/blob/master/news.arc), with an unmodified copy in `upstream/news.arc`. This is a functional port, not an Arc interpreter or a complete behavior-compatible replacement for the original application.
+Based on the [official Arc 3.2 distribution](http://www.arclanguage.org/arc3.2.tar), with its complete, unmodified contents in `upstream/`. This is a functional port, not an Arc interpreter or a complete behavior-compatible replacement for the original application.
+
+Archive SHA256: `5bda6cd1e080ce7e6998665a60e9086d6e21275315c12bc4182c1ab5dfa63dda`. [upstream/SOURCE.json](upstream/SOURCE.json) records each original file's SHA256. The initial implementation used an older public Arc 3 mirror; the reference source and the behavior listed below have now been updated against the official 3.2 release.
 
 ## Run locally
 
@@ -42,9 +44,9 @@ Register your production account and run the administrator SQL above with `--rem
 
 ## Implemented
 
-- Ranked front page, newest, best, active discussions, ask/show filters, polls, recent/best comments, per-user submissions and comments, leaders, and RSS.
+- Ranked front page, newest, best, active discussions, ask/show filters, polls, recent/best comments, per-user submissions and comments, leaders, and RSS. Arc 3.2's `/noobstories` and `/noobcomments` list items submitted while the author's account was less than two days old, regardless of the account's current age.
 - Link/text submissions, normalized duplicate URLs, nested replies, paragraph/italic/code formatting, two-hour author editing, and deletion that preserves replies.
-- Upvotes, undoing votes, comment downvotes at 500 karma, atomic score/karma changes, one poll choice per user, private saved items, and flags.
+- Upvotes, undoing votes, comment downvotes above 200 karma, atomic score/karma changes, one poll choice per user, private saved items, and flags. Downvotes cannot target replies to the voter's own item. As in Arc 3.2, the downvote arrow disappears after 24 hours except for administrators; the direct vote handler itself does not enforce that display window.
 - Registration/login, private profile email, password changes, session expiry/revocation, administrator bans, moderation queues, and an action log.
 - Server-rendered responsive HTML, accessible form labels, POST-only mutations, origin/CSRF checks, escaped content, restrictive CSP, request-size limits, and database-backed rate limits.
 
@@ -56,13 +58,15 @@ Register your production account and run the administrator SQL above with `--rem
 | Files under `arc/news/` | D1 relational tables, indexes, constraints and transactions |
 | Process-wide item/profile/vote tables | Per-request D1 reads; no durable state in isolate globals |
 | Random background re-ranking | Recompute on each front-page read across the latest 1,000 stories |
-| `frontpage-rank` | Original score exponent `.8`, gravity `1.8`, 120-minute base, text `.4`, image and controversy penalties |
+| `frontpage-rank` | Original score exponent `.8`, gravity `1.8`, 120-minute base, text `.4`, Arc 3.2 comment `.5`, image/dead-item and controversy penalties; controversy includes the story itself in the visible family count |
+| `display-subcomments` | Order sibling comments by their age-adjusted Arc rank |
 | In-process login/session state | Salted PBKDF2-SHA256 passwords; random sessions stored as SHA256 hashes |
 | Background cleanup | Workers scheduled handler |
 
 This release deliberately differs from Arc in several areas:
 
 - It does not run arbitrary Arc code or preserve REPL hooks, server administration pages, IP/domain ban lists, word-scrubbing rules, sockpuppet scoring, voting-bias heuristics, automatic flag killing, delayed comments, or anti-procrastination settings.
+- Arc 3.2 also changes automatic flag killing and low-karma abuse handling. Those systems remain outside this port. Domain/key-based lightweight classifications and the full original visibility rules are not implemented. Flagging, moderation permissions, undoing votes, poll restrictions, and other behavior still differ from Arc; the 3.2 comparison does not establish full compatibility.
 - It does not import an existing Arc data directory or migrate legacy password hashes. Start with a new database; do not replace a live Arc installation without a separate data migration.
 - Email is private profile metadata only; outbound mail, address verification and forgotten-password recovery are not implemented. Password changes require the current password.
 - Comment rendering is limited to 500 descendants and 20 visible nesting levels per view, with links to continue subthreads. The recursive query caps depth at 64. Listings paginate 30 items at a time. Ranking/best/active consider the latest 1,000 stories.
@@ -79,12 +83,12 @@ pnpm test
 pnpm build
 ```
 
-Tests run the actual bundled Worker in workerd/Miniflare with D1, rather than mocking the database. They cover accounts and cookies, CSRF, submission, concurrent voting, nested replies, authorization, polls, moderation, private profile data, password/session revocation, pagination, rate limits, deleted-thread rendering, and the Arc ranking formula.
+Tests run the actual bundled Worker in workerd/Miniflare with D1, rather than mocking the database. They cover accounts and cookies, CSRF, submission, concurrent voting, nested replies, authorization, polls, moderation, private profile data, password/session revocation, pagination, rate limits, deleted-thread rendering, and the Arc 3.2 ranking formula. Regression tests cover the strict downvote threshold and reply restriction, arrow expiry, new-account listing boundaries, controversy family size, and comment ordering.
 
 The test runtime is pinned to the Miniflare version bundled with the pinned Wrangler release, including its v4 options adapter. Test data is isolated from the local preview database. The build command creates a deployable Worker bundle without deploying it.
 
 ## Source layout
 
-`src/index.ts` handles HTTP and scheduled events. `auth.ts` handles identity, forms, and rate limits. `actions.ts` contains mutations; `pages.ts` contains reads; `html.ts` renders HTML; `ranking.ts` contains the ranking formula. `migrations/0001_news.sql` defines the database and voting triggers.
+`src/index.ts` handles HTTP and scheduled events. `auth.ts` handles identity, forms, and rate limits. `actions.ts` contains mutations; `pages.ts` contains reads; `html.ts` renders HTML; `ranking.ts` contains the ranking formula; `voting.ts` holds downvote eligibility. `migrations/0001_news.sql` defines the database and voting triggers. Files in `upstream/` are reference material and are not bundled into the Worker.
 
 Licensed under Artistic-2.0. Original copyright and modification notes are in `NOTICE` and `upstream/copyright`.

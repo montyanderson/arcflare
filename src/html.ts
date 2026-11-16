@@ -1,4 +1,5 @@
 import { Context, Item, now, editor } from './types';
+import { showDownvote } from './voting';
 
 export const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export const link = (text: unknown, href: string) => `<a href="${escape(href)}">${escape(text)}</a>`;
@@ -40,7 +41,7 @@ export function itemHtml(ctx: Context, item: Item, number?: number) {
   const domain = item.url && visible ? ` <span class="domain">(${escape(new URL(item.url).hostname)})</span>` : '';
   const eligible = ctx.user && !removed && ctx.user.id!==item.by;
   const vote = eligible && !item.voted ? action(ctx,'/vote',item.id,'▲',hidden('dir','up')) : '<span class="muted">·</span>';
-  const voting = eligible && item.voted ? ` | ${action(ctx,'/vote',item.id,'unvote',hidden('dir','unvote'))}` : eligible && item.type==='comment' && ctx.user!.karma>=500 && item.score>-4 ? ` | ${action(ctx,'/vote',item.id,'downvote',hidden('dir','down'))}` : '';
+  const voting = eligible && item.voted ? ` | ${action(ctx,'/vote',item.id,'unvote',hidden('dir','unvote'))}` : showDownvote(ctx.user,item) ? ` | ${action(ctx,'/vote',item.id,'downvote',hidden('dir','down'))}` : '';
   const tools = ctx.user ? ` | ${action(ctx,'/save',item.id,item.saved?'unsave':'save')}${!removed&&ctx.user.id!==item.by?` | ${action(ctx,'/flag',item.id,'flag')}`:''}` : '';
   const edit = ctx.user && (ctx.user.id===item.by || mod) ? ` | ${link('edit',`/edit?id=${item.id}`)}` : '';
   const moderation = mod ? ` | ${action(ctx,'/moderate',item.id,item.dead?'restore':'kill',hidden('action',item.dead?'restore':'kill'))}` : '';

@@ -3,7 +3,8 @@ import { Context, HttpError, Item, editor } from './types';
 export const columns = `i.*, (SELECT COUNT(*) FROM items c WHERE c.root=i.id AND c.type='comment' AND c.dead=0 AND c.deleted=0) AS comments,
   (SELECT direction FROM votes WHERE item_id=i.id AND user_id=?) AS voted,
   (SELECT COUNT(*) FROM saved WHERE item_id=i.id AND user_id=?) AS saved,
-  (SELECT COUNT(*) FROM flags WHERE item_id=i.id) AS flags`;
+  (SELECT COUNT(*) FROM flags WHERE item_id=i.id) AS flags,
+  (SELECT by FROM items WHERE id=i.parent) AS parent_by`;
 export async function items(ctx: Context, where: string, values: unknown[] = [], order = 'i.id DESC', limit = 1000, offset = 0): Promise<Item[]> {
   const result = await ctx.env.DB.prepare(`SELECT ${columns} FROM items i WHERE ${where} ORDER BY ${order} LIMIT ? OFFSET ?`)
     .bind(ctx.user?.id||'',ctx.user?.id||'',...values,limit,offset).all<Item>();
