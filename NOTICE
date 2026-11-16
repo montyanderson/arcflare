@@ -17,8 +17,8 @@ This modified distribution, created on 2026-11-16, executes the original Arc
 libraries in the Rainbow.js VM. Separate host adapters replace the Scheme
 host, socket server, disk filesystem, OS background threads, random device,
 and password subprocess with Workers APIs, SQLite Durable Object storage,
-alarms, and Web Crypto. Compatibility bindings and Arc platform overrides
-are in native/. The official Arc files and vendored VM source are preserved.
+alarms, and Web Crypto. Compatibility bindings, parser/numeric/UTF-8 corrections, and Arc platform
+overrides are in native/. The official Arc files and vendored VM source are preserved.
 
 This supersedes the repository's initial partial TypeScript/D1 rewrite.
 It uses a different name to distinguish it from the Standard Version and

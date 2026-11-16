@@ -1,0 +1,18 @@
+export const setup=String.raw`(do
+  (assign seconds (fn () 1700000000) msec (fn () 1700000000000) memory (fn () 64000000))
+  (ensure-srvdirs) (map ensure-dir (list newsdir* storydir* votedir* profdir*))
+  (load-userinfo) (load-items)
+  (each u '("alice" "bob" "erin") (ensure-news-user u))
+  (= admins* '("alice") (uvar "erin" auth) 1)
+  (= (cookie->user* 'alicecookie) "alice" (cookie->user* 'bobcookie) "bob" (cookie->user* 'erincookie) "erin")
+  (= (user->cookie* "alice") 'alicecookie (user->cookie* "bob") 'bobcookie (user->cookie* "erin") 'erincookie)
+  (= (uvar "alice" karma) 500 (uvar "bob" karma) 10)
+  (= (logins* "alice") "127.0.0.1" (logins* "bob") "127.0.0.2")
+  (let s (create-story "https://example.org/story" "Reference story" nil "alice" "127.0.0.1")
+    (submit-item "alice" s)
+    (let c (create-comment s "A <i>comment</i>." "bob" "127.0.0.2")
+      (submit-item "bob" c)
+      (submit-item "alice" (create-comment c "A nested reply." "alice" "127.0.0.1"))))
+  (submit-item "alice" (create-poll "Reference poll" "Pick a language." "Arc\n\nScheme" "alice" "127.0.0.1"))
+  (gen-topstories)
+  nil)`;

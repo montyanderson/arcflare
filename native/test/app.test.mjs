@@ -7,6 +7,7 @@ import {build} from 'esbuild';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 
 let mf,directory,alice,bob,story,staleForm;
+let bobPassword='a long test password';
 const origin='http://localhost';
 const options=()=>convertV4MiniflareOptions({name:'arc-news-native-test',modules:true,scriptPath:'dist/native-test.js',compatibilityDate:'2026-11-16',durableObjects:{NEWS:{className:'ArcNews',useSQLite:true}},resourcePersistencePath:directory,bindings:{ADMIN_USERS:'alice'}});
 const decode=s=>s.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>');
@@ -53,11 +54,12 @@ test('original closure-based registration creates persistent accounts and admin 
 });
 test('original submit form creates a story and resolves its redirect',async()=>{
   const html=await(await get('/submit',alice)).text();const form=forms(html)[0];assert.equal(form.action,'/r');
-  const response=await post(form,{t:'Native Arc story',u:'https://example.com/native',x:''},alice);
+  const response=await post(form,{t:'Native Arc story 🌍 #(literal)',u:'https://example.com/native',x:''},alice);
   assert.equal(response.status,302,await response.text());
   const newest=await(await get('/newest',alice)).text();assert.match(newest,/Native Arc story/);
   const links=[...newest.matchAll(/href="item\?id=(\d+)"/g)];assert.ok(links.length);story=links[0][1];
   assert.ok(!newest.includes('@(plural'));
+  assert.match(newest,/🌍 #\(literal\)/);
 });
 test('original voting handler updates score only once',async()=>{
   const html=await(await get(`/item?id=${story}`,bob)).text();
@@ -123,6 +125,41 @@ test('original administrator REPL evaluates Arc and denies ordinary users',async
   const denied=await post(form,{expr:'(+ 20 22)'},bob);assert.match(await denied.text(),/Sorry\./);
   assert.match(await(await get('/item?id=999999999')).text(),/No such item/);
 });
+test('official URL parsing and invalid item IDs retain their original behaviour',async()=>{
+  for(const path of ['/item?id=alice','/item?id=363%2Fblank.php','/edit?id=-1','/reply?id=missing']){
+    const response=await get(path,alice);assert.equal(response.status,200);assert.match(await response.text(),/No such item/);
+  }
+  assert.match(await(await get('/user?%69d=alice')).text(),/No such user/);
+  assert.match(await(await get('/user?id=alice=ignored')).text(),/Profile: alice/);
+  const empty=await get('/a?fnid=missing');assert.equal(empty.status,200);assert.equal(await empty.text(),'');
+});
+test('password resets use the original form and survive restart',async()=>{
+  const form=forms(await(await get('/resetpw',bob)).text())[0];
+  bobPassword='changed through original reset form';
+  assert.equal((await post(form,{p:bobPassword},bob)).status,200);
+});
+test('the original edit and delete-confirmation forms preserve thread data',async()=>{
+  let form=forms(await(await get('/edit?id='+story,alice)).text())[0];
+  assert.equal((await post(form,{title:'Native Arc story 🌍 #(literal) edited'},alice)).status,200);
+  let page=await(await get('/item?id='+story,alice)).text();
+  form=forms(await(await get(href(page,'delete'),alice)).text())[0];
+  assert.equal((await post(form,{b:'Yes'},alice)).status,302);
+  page=await(await get('/item?id='+story,alice)).text();
+  form=forms(await(await get(href(page,'undelete'),alice)).text())[0];
+  assert.equal((await post(form,{b:'No'},alice)).status,302);
+  assert.match(await(await get('/item?id='+story,bob)).text(),/Nested original reply/);
+});
+test('administrator Arc programs and binary static files use the virtual filesystem',async()=>{
+  const form=forms(await(await get('/prompt',alice)).text())[0];
+  const editor=await post(form,{app:'persistent-example'},alice);
+  const editForm=forms(await editor.text())[0];
+  const saved=await post(editForm,{exprs:'(pr "persistent program 🌍 #(literal)")',cmd:'save'},alice);
+  assert.match(await saved.text(),/persistent-example/);
+  const response=await post({action:'/repl',fields:{}},{expr:'(readb (infile "static/arc.png"))'},alice);
+  assert.match(await response.text(),/\n137\n/);
+  const logs=await post({action:'/repl',fields:{}},{expr:'(file-exists (logfile-name \'srv))'},alice);
+  assert.match(await logs.text(),/arc\/logs\/srv-/);
+});
 test('SQLite files survive runtime restart; expired Arc closure links fail gracefully',async()=>{
   await mf.dispose();mf=new Miniflare(options());
   const html=await(await get(`/item?id=${story}`,alice)).text();assert.match(html,/Native Arc story/);assert.match(html,/Nested original reply/);
@@ -131,5 +168,8 @@ test('SQLite files survive runtime restart; expired Arc closure links fail grace
   assert.equal(expired.status,302);assert.match(expired.headers.get('location'),/deadlink/);
   const home=await(await get()).text();const login=await(await get(href(home,'login'))).text();
   const form=forms(login).find(f=>f.html.includes('value="login"'));
-  assert.equal((await post(form,{u:'bob',p:'a long test password'})).status,302);
+  const loggedIn=await post(form,{u:'bob',p:bobPassword});
+  assert.equal(loggedIn.status,302);assert.match(loggedIn.headers.get('set-cookie'),/^user=/);
+  const prompt=await(await get('/prompt',alice)).text();assert.match(prompt,/persistent-example/);
+  assert.match(await(await get(href(prompt,'run'),alice)).text(),/persistent program 🌍 #\(literal\)/);
 });

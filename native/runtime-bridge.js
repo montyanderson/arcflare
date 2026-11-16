@@ -92,4 +92,10 @@ function load(source) {
     catch(error) {reject(error);}
   });
 }
-return {evaluate,load,bind,bindAsync,set:(name,value)=>symbol(name).setValue(toArc(value)),get:name=>fromArc(symbol(name).value())};
+async function capture(source){
+  const sink=host.output(),previous=IO_st.stdOut_.value;
+  IO_st.stdOut_.value=new Output().initOutput(sink);
+  try {await evaluate(source);return sink.bytes();}
+  finally {IO_st.stdOut_.value=previous;}
+}
+return {evaluate,capture,load,bind,bindAsync,set:(name,value)=>symbol(name).setValue(toArc(value)),get:name=>fromArc(symbol(name).value())};

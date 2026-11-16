@@ -1,6 +1,8 @@
 const encoder=new TextEncoder();
 const hex=bytes=>Array.from(new Uint8Array(bytes),n=>n.toString(16).padStart(2,'0')).join('');
 export async function sha1(password){return hex(await crypto.subtle.digest('SHA-1',encoder.encode(password)));}
+// Match the output of the openssl subprocess used by official app.arc.
+export async function arcPasswordHash(password){return 'SHA1(stdin)= '+await sha1(password);}
 export async function hashPassword(password,salt=hex(crypto.getRandomValues(new Uint8Array(24)))){
   const key=await crypto.subtle.importKey('raw',encoder.encode(password),'PBKDF2',false,['deriveBits']);
   const digest=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',iterations:100000,salt:encoder.encode(salt)},key,256);

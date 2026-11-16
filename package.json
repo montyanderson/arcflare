@@ -1,6 +1,6 @@
 {
   "name": "arc-news-workers",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,9 @@
     "check": "node scripts/check-native.mjs",
     "build": "wrangler deploy --dry-run --outdir dist",
     "test": "node scripts/build-native.mjs && node --test native/test/*.test.mjs",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "reference:setup": "node scripts/setup-reference.mjs",
+    "test:reference": "node scripts/test-reference.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

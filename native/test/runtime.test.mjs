@@ -29,6 +29,8 @@ test('Workers ticks run registered Arc background functions only when due',async
   assert.equal(await news.runtime.evaluate('worker-ticks*'),1);
   await news.runtime.evaluate('(= (worker-bg-last* \'worker-test) (- (seconds) 61))');
   await news.tick();assert.equal(await news.runtime.evaluate('worker-ticks*'),2);
+  await news.runtime.evaluate('(= (worker-bg-last* \'rerank-random) (- (seconds) 20) (worker-bg-last* \'update-avg) (- (seconds) 40))');
+  assert.equal(await news.nextDelay(),5,'Wake for the 45-second averaging job before the next 30-second ranking job');
 });
 
 test('independent runtimes isolate symbols and user data',async()=>{
@@ -48,4 +50,26 @@ test('Web Crypto passwords support salted new hashes and original OpenSSL SHA1 r
   for(const stored of [legacy,`(stdin)= ${legacy}`,`SHA1(stdin)= ${legacy}`])assert.equal(await verifyPassword(password,stored),true);
   assert.equal(await verifyPassword('wrong',legacy),false);
   assert.equal(await verifyPassword(password,null),false);
+});
+test('official numeric predicates, signed arithmetic and real formatting are preserved',async()=>{
+  const run=source=>news.runtime.evaluate(source);
+  for(const value of ['nil','"bad-id"','\'missing'])assert.equal(await run('(exact '+value+')'),null);
+  assert.equal(await run('(trunc -1.9)'),-1);
+  assert.equal(await run('(tostring (write (/ 1 -2)))'),'-1/2');
+  assert.equal(await run('(mod 5 -3)'),-1);
+  assert.equal(await run('(tostring (write 1.0))'),'1.0');
+  assert.equal(await run('(tostring (write 1e-8))'),'1e-08');
+});
+test('UTF-8 ports, Scheme string literals and long lists match the official reader',async()=>{
+  const run=source=>news.runtime.evaluate(source);
+  assert.equal(await run('(urldecode "%C3%A9%F0%9F%8C%8D")'),'é🌍');
+  assert.equal(await run('(tostring (writeb 65))'),'A');
+  assert.equal(await run('(readb (instring "A"))'),65);
+  assert.equal(await run('(len "a🌍é")'),3);
+  assert.equal(await run('(string ("a🌍" 1))'),'🌍');
+  news.runtime.set('worker-reader-text*','"#(literal)"');
+  assert.equal(await run('(read worker-reader-text*)'),'#(literal)');
+  news.runtime.set('worker-reader-text*','"\\U0001F30D"');
+  assert.equal(await run('(read worker-reader-text*)'),'🌍');
+  assert.equal(await run('(len (coerce (newstring 70000 #\\x) \'cons))'),70000);
 });

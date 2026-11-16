@@ -2,12 +2,8 @@
 (def ensure-dir (path) (worker-mkdir path))
 (def shash (text) (worker-sha1 text))
 
-; Preserve Arc's account/cookie flows while replacing the openssl subprocess
-; with Workers Web Crypto. New passwords are salted; old SHA1 data is readable.
-(def set-pw (user pw)
-  (= (hpasswords* user) (and pw (worker-password-hash pw)))
-  (save-table hpasswords* hpwfile*))
-
+; Keep original SHA1 account records. Also accept salted records written by
+; the earlier version of this port so existing accounts can still log in.
 (def good-login (user pw ip)
   (let record (list (seconds) ip user)
     (if (and user pw (worker-password-matches pw (hpasswords* user)))
@@ -24,11 +20,20 @@
       (errsafe (f))))
   (harvest-fnids))
 
+(def worker-next-delay ()
+  (when pending-bgthreads*
+    (max 1 (apply min
+             (map (fn ((id f sec))
+                    (- (+ (worker-bg-last* id (seconds)) sec) (seconds)))
+                  pending-bgthreads*)))))
+
 (def worker-start ()
   (ensure-srvdirs)
   (map ensure-dir (list newsdir* storydir* votedir* profdir*))
   (load-userinfo)
-  (load-items))
+  (load-items)
+  ; srv.arc sleeps before each background function's first invocation.
+  (each (id f sec) pending-bgthreads* (= (worker-bg-last* id) (seconds))))
 
 ; These counters were incremented by the socket accept loop in srv.arc.
 (def worker-count-request (ip)

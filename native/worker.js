@@ -1,13 +1,16 @@
 import {DurableObject} from 'cloudflare:workers';
 import {createNews} from './engine.js';
 import {SqlFiles} from './storage.js';
-import assets from './generated/assets.js';
 
 function parseResponse(raw,request){
-  const split=raw.search(/\r?\n\r?\n/);
-  if(split<0)throw new Error('Arc returned an invalid HTTP response');
-  const headerText=raw.slice(0,split);
-  const body=raw.slice(split+(raw[split]==='\r'?4:2));
+  let split=-1,length=0;
+  for(let i=0;i<raw.length-1;i++){
+    if(raw[i]===10&&raw[i+1]===10){split=i;length=2;break;}
+    if(raw[i]===13&&raw[i+1]===10&&raw[i+2]===13&&raw[i+3]===10){split=i;length=4;break;}
+  }
+  // The original /a handler can emit a header-only response.
+  const headerText=new TextDecoder().decode(split<0?raw:raw.subarray(0,split));
+  const body=split<0?new Uint8Array():raw.subarray(split+length);
   const lines=headerText.split(/\r?\n/);
   const status=Number(lines.shift().match(/^HTTP\/1\.[01] (\d{3})/)?.[1]);
   if(!status)throw new Error('Arc returned an invalid HTTP status');
@@ -28,19 +31,23 @@ export class ArcNews extends DurableObject {
     if(!this.news){this.news=await createNews(this.files,{admins:this.env.ADMIN_USERS});this.files.commit();}
     return this.news;
   }
+  async schedule(news,force=false){
+    const delay=await news.nextDelay();
+    if(delay===null){await this.ctx.storage.deleteAlarm();return;}
+    const next=Date.now()+delay*1000,current=await this.ctx.storage.getAlarm();
+    if(force||current===null||current<=Date.now()||next<current)await this.ctx.storage.setAlarm(next);
+  }
   async fetch(request){
     return this.serial(async()=>{
       const url=new URL(request.url);
       if(!['GET','POST','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
-      const args=[...url.searchParams];
-      if(request.method==='POST')args.unshift(...new URLSearchParams(await request.text()));
-      const cookies=(request.headers.get('Cookie')||'').split(';').flatMap(part=>{const i=part.indexOf('=');return i<0?[]:[[part.slice(0,i).trim(),part.slice(i+1).trim()]];});
+      const rawBody=request.method==='POST'?await request.text():'';
       try{
         const news=await this.ready();
-        const raw=await news.handle({path:url.pathname,args,cookies,ip:request.headers.get('CF-Connecting-IP')||'127.0.0.1'});
+        const raw=await news.handleBytes({path:url.pathname,rawQuery:url.search.slice(1),rawBody,rawCookieHeader:request.headers.get('Cookie')||'',ip:request.headers.get('CF-Connecting-IP')||'127.0.0.1',method:request.method});
         const response=parseResponse(raw,request);
         this.files.commit();
-        if(await this.ctx.storage.getAlarm()===null)await this.ctx.storage.setAlarm(Date.now()+30000);
+        await this.schedule(news);
         return response;
       }catch(error){
         this.files.rollback();this.news=null;
@@ -51,17 +58,12 @@ export class ArcNews extends DurableObject {
     });
   }
   async alarm(){return this.serial(async()=>{
-    try{await(await this.ready()).tick();this.files.commit();await this.ctx.storage.setAlarm(Date.now()+30000);}
+    try{const news=await this.ready();await news.tick();this.files.commit();await this.schedule(news,true);}
     catch(error){this.files.rollback();this.news=null;throw new Error('Arc background job failed');}
   });}
 }
 export default {
   async fetch(request,env){
-    const path=new URL(request.url).pathname;
-    if(Object.hasOwn(assets,path)&&['GET','HEAD'].includes(request.method)){
-      const bytes=Uint8Array.from(atob(assets[path]),c=>c.charCodeAt(0));
-      return new Response(request.method==='HEAD'?null:bytes,{headers:{'Content-Type':path.endsWith('.png')?'image/png':path.endsWith('.gif')?'image/gif':'text/html; charset=utf-8'}});
-    }
     return env.NEWS.get(env.NEWS.idFromName('news')).fetch(request);
   }
 };
