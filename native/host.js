@@ -44,7 +44,6 @@ export function makeHost(sources,storage=new Map()) {
       if(command==='rm arc/news/story/*.tmp'){for(const key of storage.keys())if(key.startsWith('arc/news/story/')&&key.endsWith('.tmp'))storage.delete(key);return true;}
       throw new Error('Unsupported process operation: '+command);
     },
-    random(){return Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');},
     mkdir(path){dirs.add(normalize(path));return true;},
     input,read,write,storage,directoryExists:path=>dirs.has(normalize(path)),
     takeOutput(){const result=output;output='';return result;}

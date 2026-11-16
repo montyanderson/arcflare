@@ -6,9 +6,6 @@
   "build": {
     "command": "node scripts/build-native.mjs"
   },
-  "vars": {
-    "SITE_NAME": "Arc News"
-  },
   "durable_objects": {
     "bindings": [
       {

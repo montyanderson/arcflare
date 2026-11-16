@@ -8,7 +8,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 
 let mf,directory,alice,bob,story,staleForm;
 const origin='http://localhost';
-const options=()=>convertV4MiniflareOptions({name:'arc-news-native-test',modules:true,scriptPath:'dist/native-test.js',compatibilityDate:'2026-11-16',durableObjects:{NEWS:{className:'ArcNews',useSQLite:true}},resourcePersistencePath:directory,bindings:{SITE_NAME:'Official Arc News',ADMIN_USERS:'alice'}});
+const options=()=>convertV4MiniflareOptions({name:'arc-news-native-test',modules:true,scriptPath:'dist/native-test.js',compatibilityDate:'2026-11-16',durableObjects:{NEWS:{className:'ArcNews',useSQLite:true}},resourcePersistencePath:directory,bindings:{ADMIN_USERS:'alice'}});
 const decode=s=>s.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>');
 function attr(tag,name){return decode(tag.match(new RegExp('(?:^|\\s)'+name+'=(?:"([^"]*)"|([^\\s>]+))'))?.slice(1).find(v=>v!==undefined)||'');}
 function forms(html){return [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/g)].map(m=>({action:attr(m[1],'action'),html:m[2],fields:Object.fromEntries([
@@ -28,7 +28,7 @@ async function register(name){
   assert.ok(form);
   const response=await post(form,{u:name,p:'a long test password'});
   assert.equal(response.status,302,await response.text());
-  assert.match(response.headers.get('set-cookie'),/HttpOnly/);
+  assert.match(response.headers.get('set-cookie'),/^user=[^;]+; expires=Sun, 17-Jan-2038 19:14:07 GMT$/);
   return response.headers.get('set-cookie').split(';')[0];
 }
 before(async()=>{
@@ -40,9 +40,9 @@ after(async()=>{if(mf)await mf.dispose();if(directory)await rm(directory,{recurs
 
 test('official Arc renders its own front page, scripts, CSS and binary assets',async()=>{
   const response=await get();assert.equal(response.status,200);
-  const html=await response.text();assert.match(html,/<title>Official Arc News<\/title>/);assert.match(html,/function vote\(node\)/);
+  const html=await response.text();assert.match(html,/<title>My Forum<\/title>/);assert.match(html,/function vote\(node\)/);
   assert.match(html,/href="\/x\?fnid=/);
-  const css=await get('/news.css');assert.match(css.headers.get('content-type'),/text\/css/);
+  const css=await get('/news.css');assert.match(css.headers.get('content-type'),/text\/html/);assert.equal(css.headers.get('cache-control'),'max-age=86400');
   const png=await get('/arc.png');assert.equal(png.headers.get('content-type'),'image/png');assert.equal((await png.arrayBuffer()).byteLength,113);
 });
 test('original closure-based registration creates persistent accounts and admin permissions',async()=>{
@@ -106,12 +106,15 @@ test('original moderation links can kill and restore items',async()=>{
   assert.equal((await get(href(html,'unkill'),alice)).status,302);
   assert.match(await(await get('/newest',bob)).text(),/Native Arc story/);
 });
-test('Worker adapters reject cross-site forms and oversize request bodies',async()=>{
-  const form=forms(await(await get('/submit',alice)).text())[0];
-  assert.equal((await post(form,{t:'forged',u:'https://example.com/forged'},alice,{origin:'https://evil.example'})).status,403);
-  assert.equal((await post(form,{x:'x'.repeat(70000)},alice)).status,413);
-  assert.equal((await mf.dispatchFetch(origin+'/repl?expr=1',{headers:{cookie:alice,'Sec-Fetch-Site':'cross-site'}})).status,403);
-  staleForm=form;
+test('HTTP adapter preserves original form handling and response headers',async()=>{
+  const response=await get();
+  for(const header of ['content-security-policy','cache-control','referrer-policy','x-content-type-options'])assert.equal(response.headers.get(header),null);
+  const form={action:'/repl',fields:{}};
+  const result=await post(form,{expr:'(+ 20 22)'},alice,{origin:'https://example.org'});
+  assert.equal(result.status,200);assert.match(await result.text(),/\n42\n/);
+  const large=await post(form,{expr:' '.repeat(70000)+'(+ 20 22)'},alice);
+  assert.equal(large.status,200);assert.match(await large.text(),/\n42\n/);
+  staleForm=forms(await(await get('/submit',alice)).text())[0];
 });
 test('original administrator REPL evaluates Arc and denies ordinary users',async()=>{
   const form={action:'/repl',fields:{}};

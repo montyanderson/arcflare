@@ -1,17 +1,6 @@
 ; Platform adapters are loaded after the unmodified official libraries.
 (def ensure-dir (path) (worker-mkdir path))
-(def unique-id () (sym (worker-random)))
 (def shash (text) (worker-sha1 text))
-
-; Workers does not expose process memory usage. Keep the useful admin stats.
-(def admin-bar (user elapsed whence)
-  (when (admin user)
-    (br2)
-    (w/bars
-      (pr (len items*) "/" maxid* " loaded")
-      (pr elapsed " msec")
-      (link "settings" "newsadmin")
-      (hook 'admin-bar user whence))))
 
 ; Preserve Arc's account/cookie flows while replacing the openssl subprocess
 ; with Workers Web Crypto. New passwords are salted; old SHA1 data is readable.

@@ -15,15 +15,13 @@ export async function createNews(storage,options={}){
   runtime.bindAsync('worker-password-matches',verifyPassword);
   runtime.bindAsync('worker-sha1',sha1);
   for(const name of ['arc.arc','strings.arc','pprint.arc','code.arc','html.arc','srv.arc','app.arc','prompt.arc','news.arc','workers.arc'])await runtime.load(sources[name]);
-  if(options.siteName)runtime.set('this-site*',options.siteName);
   await runtime.evaluate('(worker-start)');
   host.takeOutput();
   return {
     runtime,host,
-    async handle({path,args=[],cookies=[],ip='127.0.0.1',origin='http://localhost'}){
+    async handle({path,args=[],cookies=[],ip='127.0.0.1'}){
       runtime.set('worker-path*',path.replace(/^\//,''));
       runtime.set('worker-args*',args);runtime.set('worker-cooks*',cookies);runtime.set('worker-ip*',ip);
-      runtime.set('site-url*',origin+'/');runtime.set('parent-url*',origin+'/');
       if(await runtime.evaluate('(or (ignore-ips* worker-ip*) (abusive-ip worker-ip*))'))return 'HTTP/1.1 429 Too Many Requests\nContent-Type: text/plain\n\nToo many requests.';
       await runtime.evaluate('(worker-tick)');
       await runtime.evaluate('(worker-count-request worker-ip*)');

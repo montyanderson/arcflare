@@ -44,7 +44,9 @@ function bindAsync(name,fn) {
     vm.pushFrame(step);
   };
 }
-for (const name of ['memory','current-gc-milliseconds','current-process-milliseconds']) {
+// Workers has no heap-usage API. Zero is an unsupported sentinel, not a measurement.
+bind('memory',()=>0);
+for (const name of ['current-gc-milliseconds','current-process-milliseconds']) {
   bind(name,()=>{throw new Error(name+' is unavailable in Workers');});
 }
 bind('timedate',(seconds=Date.now()/1000)=>{
@@ -54,7 +56,6 @@ bind('timedate',(seconds=Date.now()/1000)=>{
 bind('system',command=>host.system(command));
 bind('file-exists',path=>host.read(path)!==undefined?path:null);
 bind('dir-exists',path=>host.directoryExists(path)?path:null);
-bind('worker-random',()=>host.random());
 bind('worker-mkdir',path=>host.mkdir(path));
 // Arc 3.2 implements @ interpolation in ac.scm. Rainbow delegates it to
 // at-string; build the same (string ...) expression without JavaScript eval.

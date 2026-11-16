@@ -23,7 +23,7 @@ ADMIN_USERS=your_username
 
 Register the account before granting it administrator access. The first account is not automatically an administrator. `ADMIN_USERS` accepts comma-separated names and replaces the administrator list when a runtime starts; an empty value clears it. If omitted, the stored list is retained. Administrators have the original `/newsadmin`, `/prompt`, and `/repl` pages, including the ability to execute Arc code.
 
-Set `SITE_NAME` in `wrangler.jsonc` to change the title.
+The site keeps the official defaults: `My Forum`, the original logo destination and RSS URLs, grey colours, HTML, CSS, images, labels, and administrator bar. The Worker does not override site configuration or page rendering.
 
 ## Deploy
 
@@ -51,9 +51,9 @@ The original application supplies its routes, HTML, Arc macros, forms, closure U
 | Random bytes | `crypto.getRandomValues`, including the original `/dev/urandom` reader |
 | Static files | Original images and `robots.txt` served by the outer Worker |
 
-The bridge implements Arc 3.2 string interpolation and corrects Rainbow's file/directory existence adapters. The admin status bar omits process-memory usage because Workers does not expose it. New password records use 100,000 PBKDF2 iterations; existing SHA1 records remain unchanged until the password is set again.
+The bridge implements Arc 3.2 string interpolation and corrects Rainbow's file/directory existence adapters. The original admin status bar is retained. Workers does not expose process-memory usage, so the `memory` primitive returns `0` as an unsupported sentinel; its `0 mb` display is not a measurement. New password records use 100,000 PBKDF2 iterations; existing SHA1 records remain unchanged until the password is set again.
 
-Cookies use `HttpOnly`, `SameSite=Lax`, and `Secure` on HTTPS. POST requests require a matching `Origin`. Cross-site browser requests to closure actions, voting, and the administrator REPL are rejected using Fetch Metadata. Forms have a 64 KiB request limit. Personalized responses are not HTTP-cached. Arc's original cookie lifetime, password-length policy, and account logic otherwise remain in effect.
+Arc controls the response body, cookies, MIME types, redirects, and cache headers. The Worker strips only HTTP connection/framing headers managed by the Fetch runtime. It does not add a content-security policy, cookie attributes, origin checks, or a custom form-size limit. Original form handling and browser-visible behaviour are preserved. Password storage remains a backend adaptation using Web Crypto.
 
 ## Operational limits
 
@@ -74,7 +74,9 @@ pnpm test
 pnpm build
 ```
 
-`check` verifies every official file against its recorded SHA256, verifies the vendored VM, and checks JavaScript syntax. `test` runs the bundled Worker in workerd/Miniflare with real SQLite Durable Object storage. It exercises original forms for registration, submission, comments, nested replies, voting, profile editing, polls, moderation, and the administrator REPL. It also checks restart persistence, expired callbacks, private profile data, static assets, and request validation.
+`check` verifies every official file against its recorded SHA256, verifies the vendored VM, and checks JavaScript syntax. `test` runs the bundled Worker in workerd/Miniflare with real SQLite Durable Object storage. It exercises original forms for registration, submission, comments, nested replies, voting, profile editing, polls, moderation, and the administrator REPL. It also checks restart persistence, expired callbacks, private profile data, static assets, and original request/response behaviour.
+
+A presentation regression test compares 11 anonymous and authenticated page responses against a separate VM loading only the official Arc libraries, without `workers.arc`. It permits differences only in random callback IDs and elapsed milliseconds. This verifies that the platform overrides do not change page output; it is not a comparison against the original Scheme runtime.
 
 Runtime tests cover macros, closures, continuations, interpolation, background jobs, Unicode serialization, password compatibility, and independent VM state. Storage tests cover chunk boundaries and staged writes.
 
