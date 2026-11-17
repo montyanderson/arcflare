@@ -101,6 +101,40 @@ A smaller presentation regression test also runs without Racket. Storage tests c
 
 `build` produces a deployable bundle in `dist/` without deploying it. Generated modules under `native/generated/` are rebuilt from checked-in inputs and excluded from Git.
 
+## Browser end-to-end tests
+
+```sh
+pnpm reference:setup
+pnpm exec playwright install --with-deps chromium firefox webkit
+pnpm test:e2e
+```
+
+The browser suite starts the original Scheme HTTP server and an isolated Worker with separate temporary data. Chromium, Firefox, and WebKit perform the same actions against both servers. It does not access preview accounts or production data. Both test servers bind to `0.0.0.0` on temporary ports and are stopped after each test.
+
+The recorded run on 2026-11-17 passed **63 browser tests without retries**, with **291 HTML/DOM comparisons and 291 pixel-identical screenshot pairs**. Browser versions, comparison rules, and application file checksums are recorded in [`verification/browser-results.json`](verification/browser-results.json). Run `node scripts/summarize-e2e.mjs` after a complete passing run to regenerate that record.
+
+Coverage includes anonymous/member/editor/admin pages, desktop/tablet/narrow layouts, account validation, registration, login/logout, password reset, stories, comments and nested replies, browser history, JavaScript voting, profiles and private fields, edit/delete/restore, polls, moderation, saved-item permissions, pagination, delayed comments, administrator programs, concurrent tabs, malformed requests, and browser cookies/data surviving a Worker restart. A separate real-clock browser case waits 16 seconds before following the login link and another 46 seconds before submitting signup.
+
+Page checks compare response HTML, parsed DOM, HTTP status and selected headers, JavaScript errors, and screenshots. HTML and DOM must match exactly after normalizing random callback/session identifiers. Deterministic fixtures hold clocks and memory equal; the idle signup case uses real clocks. Screenshots use the same browser, viewport, and host, with no masks or stylesheet changes. They allow at most two pixels with a maximum channel difference of 1/255 for native-control rounding between browser renderer processes; each comparison records its actual pixel difference. Larger visual differences fail.
+
+`playwright-report/` contains the HTML report; `test-results/` contains screenshots, a JSON report, and traces for failed tests. To inspect a run:
+
+```sh
+pnpm exec playwright show-report --host 0.0.0.0 --port 9323
+```
+
+On travis this is **http://travis.adn:9323**. `pnpm test:e2e --project=chromium` runs one engine; `--workers=3` runs the three engine projects concurrently. Each test still uses independent data.
+
+The standard browser dependency installer supports Debian/Ubuntu. On travis (Arch Linux), the following optional setup extracts pinned, checksum-verified Ubuntu WebKit libraries into `.reference/` without installing system packages or executing package scripts. It requires Python 3, `ar`, and `bsdtar`:
+
+```sh
+pnpm exec playwright install chromium firefox webkit
+python scripts/setup-webkit-linux.py
+E2E_WEBKIT_EXECUTABLE="$PWD/.reference/webkit-browser" pnpm test:e2e
+```
+
+The test-only fixture and control endpoint are built in a temporary directory. They are not included in `native/worker.js` or the deployment bundle. Browser coverage complements the handler and language comparisons; it does not prove every possible input or remove the runtime limits above.
+
 ## Source
 
 - `upstream/`: unmodified official Arc 3.2 distribution; checksums in `SOURCE.json`.
@@ -109,6 +143,7 @@ A smaller presentation regression test also runs without Racket. Storage tests c
 - `native/engine.js`, `host.js`, `runtime-bridge.js`: initialization, virtual filesystem, VM bindings.
 - `native/runtime-compat.js`, `parser-string.js`: compatibility corrections applied separately from the unchanged vendored VM.
 - `native/reference/`: live comparisons against the original Scheme implementation.
+- `native/e2e/`: browser comparisons against the original HTTP server, including screenshots and real-clock lifecycle checks.
 - `native/workers.arc`: platform overrides loaded after the official libraries.
 - `native/storage.js`, `passwords.js`: SQLite files and Web Crypto passwords.
 - `scripts/build-native.mjs`: bundles the original source and VM.

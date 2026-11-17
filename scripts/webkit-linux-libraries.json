@@ -1,0 +1,32 @@
+[
+  {
+    "package": "libenchant-2-2",
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/e/enchant-2/libenchant-2-2_2.3.3-2build2_amd64.deb",
+    "sha256": "4faecb5cee57ff00649b3ea4d83c072d9da2670797b7d2854708ff60cef17426"
+  },
+  {
+    "package": "libharfbuzz-icu0",
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/harfbuzz/libharfbuzz-icu0_8.3.0-2build2_amd64.deb",
+    "sha256": "9098670758e60b190d7edf367ad57e954bfc1b2a616def3f4e281062e036a843"
+  },
+  {
+    "package": "libhyphen0",
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hyphen/libhyphen0_2.8.8-7build3_amd64.deb",
+    "sha256": "b508d3a5da168ddb2ae6e79ea0521ba64cd121285db0ece438d0bd56ba628556"
+  },
+  {
+    "package": "libicu74",
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu74_74.2-1ubuntu3_amd64.deb",
+    "sha256": "d29c97a21a3e3254731cfac186e4d4e611e5e67d2c9a0430f6acfbd9acaefa2e"
+  },
+  {
+    "package": "libmanette-0.2-0",
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libm/libmanette/libmanette-0.2-0_0.2.7-1build2_amd64.deb",
+    "sha256": "8fbb67e94abf563c01398ad7458df1a6824f19a0b4337f67d61c0889771805db"
+  },
+  {
+    "package": "libxml2",
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.14+dfsg-1.3ubuntu3_amd64.deb",
+    "sha256": "8c4efd7abe155df3cf0f9b64d659f2d866215785f8e8c44234fbb341d58cc967"
+  }
+]

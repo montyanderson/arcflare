@@ -10,11 +10,14 @@
     "test": "node scripts/build-native.mjs && node --test native/test/*.test.mjs",
     "deploy": "wrangler deploy",
     "reference:setup": "node scripts/setup-reference.mjs",
-    "test:reference": "node scripts/test-reference.mjs"
+    "test:reference": "node scripts/test-reference.mjs",
+    "test:e2e": "node scripts/test-e2e.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "esbuild": "0.28.2",
     "miniflare": "5.20261113.0-beta",
+    "pngjs": "7.0.0",
     "wrangler": "4.162.0"
   },
   "description": "Official Arc News 3.2 running in a JavaScript Arc VM on Cloudflare Workers"

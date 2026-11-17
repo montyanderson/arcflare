@@ -1,0 +1,58 @@
+{
+  "startedAt": "2026-11-17T16:17:10.781Z",
+  "durationMs": 185805.664,
+  "passed": 63,
+  "failed": 0,
+  "retries": 0,
+  "node": "v26.13.0",
+  "playwright": "1.65.1",
+  "browsers": {
+    "chromium": "159.0.8154.6",
+    "firefox": "159.0",
+    "webkit": "27.2"
+  },
+  "officialArchiveSha256": "5bda6cd1e080ce7e6998665a60e9086d6e21275315c12bc4182c1ab5dfa63dda",
+  "applicationFilesSha256": {
+    "native/engine.js": "2167092dbb86747a9bdf9829549bcf30ba0ea8e9f16a5f4db09b05dce858f448",
+    "native/host.js": "3abf4a920f690fd98aecdeaef74301fe8d75860a01f5d56ed8f006e0ad6a1a97",
+    "native/parser-string.js": "2aeed89f3029bcb44ba04f326903b1e24472fb81873a2f6ab9459f99555e1a7f",
+    "native/passwords.js": "d0419b41d7039b956426ca969e3d780c0501a0d3bb052789e8682a737d8829ed",
+    "native/runtime-bridge.js": "3a8e5e78dcb5286345c297ef851fc78228608ec1f7d3c133ed2deb0a296cf555",
+    "native/runtime-compat.js": "7a84676fdcc000f381e9cacf7e75b33d299c0bdd537848190f8721b1e188280d",
+    "native/storage.js": "5d53d5599dcd08c13133be7ca5baedf9511f2a8c4c9ace958fa2fab396842879",
+    "native/worker.js": "b7a17b53fcc72e791351d1b969e0a2f7a097aa7e65ad84975de692b6e0dfc2ad",
+    "native/workers.arc": "04ab71eb237cf4b7a07fcc6d3ea20dd346da2357f21fb115b1fe6782970c57de"
+  },
+  "comparisonRules": {
+    "html": "Exact after normalizing random callback and session identifiers.",
+    "fixtures": "Equal clocks, memory and seed data; idle signup uses real clocks.",
+    "screenshots": {
+      "maxChangedPixels": 2,
+      "maxChannelDelta": 1,
+      "masks": false
+    }
+  },
+  "projects": {
+    "chromium": {
+      "tests": 21,
+      "htmlComparisons": 97,
+      "screenshotComparisons": 97,
+      "exactScreenshots": 97,
+      "roundingDifferences": []
+    },
+    "firefox": {
+      "tests": 21,
+      "htmlComparisons": 97,
+      "screenshotComparisons": 97,
+      "exactScreenshots": 97,
+      "roundingDifferences": []
+    },
+    "webkit": {
+      "tests": 21,
+      "htmlComparisons": 97,
+      "screenshotComparisons": 97,
+      "exactScreenshots": 97,
+      "roundingDifferences": []
+    }
+  }
+}
