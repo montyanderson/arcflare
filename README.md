@@ -46,7 +46,7 @@ The original application supplies its routes, HTML, Arc macros, forms, closure U
 | Socket accept loop | Worker `fetch` calls the original `respond` function |
 | Files under `arc/` | Ordered SQLite text chunks; all request writes commit together |
 | Shared tables and closures | One named Durable Object per site; an explicit queue prevents request interleaving during asynchronous crypto |
-| Background ranking and averages | Original `defbg` functions invoked when due; alarms track the next 30-second ranking or 45-second averaging deadline |
+| Background ranking and averages | Original `defbg` functions invoked when due; an in-memory timer and a durable recovery alarm track the next 30-second ranking or 45-second averaging deadline |
 | OpenSSL password subprocess | Original SHA1 records computed by Web Crypto; earlier PBKDF2 records remain readable |
 | Random bytes | `crypto.getRandomValues`, including the original `/dev/urandom` reader |
 | Static files | Original `respond` handler reads virtual binary files; HTTP output preserves the bytes and request statistics |
@@ -59,7 +59,7 @@ Arc controls the response body, cookies, MIME types, redirects, and cache header
 
 - **Open forms and closure links expire on a cold restart or object eviction.** Arc stores callbacks in memory. Reload the page to obtain a new callback. Accounts, cookies, posts, comments, profiles, votes, and other saved Arc files persist. Unsaved REPL changes and request-rate counters do not persist.
 - A single object owns the site. Original Arc tables are loaded into its memory, and requests run sequentially. Large sites must be measured against Workers memory, CPU, and storage limits; this port does not add sharding. Cold starts compile the Arc libraries and load saved items.
-- Alarms continue after the first request, scheduled for the next original maintenance deadline. This generates ongoing Durable Object activity.
+- Maintenance timers and recovery alarms continue after the first request. The pending timer prevents ordinary idle hibernation from discarding form callbacks while a user fills in a form. This keeps the object resident and incurs ongoing Durable Object duration charges. Deployments, failures, and platform restarts can still invalidate callbacks. See Cloudflare's [Durable Object lifecycle](https://developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/).
 - General OS subprocesses, sockets, native threads, and process/GC metrics are unavailable. Directory creation and temporary-file cleanup are adapted. Administrator programs that depend on other OS facilities need additional adapters.
 - HTTP connection teardown is controlled by Cloudflare. An IP rejected by Arc receives an empty 429 response instead of the original socket being forcibly closed. HTTP framing is supplied by the platform.
 - Arbitrary Arc programs can still expose VM differences, including JavaScript-number precision and printed representations of functions and exceptions. The compatibility suite covers the news application and selected language operations; it is not a language conformance proof.
@@ -78,7 +78,7 @@ pnpm build
 
 `check` verifies every official file against its recorded SHA256, verifies the vendored VM, and checks JavaScript syntax. `test` runs the bundled Worker in workerd/Miniflare with real SQLite Durable Object storage. It exercises original forms for registration, submission, comments, nested replies, voting, profile editing, polls, moderation, and the administrator REPL. It also checks restart persistence, expired callbacks, private profile data, static assets, and original request/response behaviour.
 
-The native suite currently has 25 passing tests. It includes Unicode and literal `#(text)` round-trips, invalid item IDs, original query decoding, binary file reads, request logs, password reset, edit/delete confirmation, and saved Arc programs surviving a full restart.
+The native suite currently has 26 tests. It includes Unicode and literal `#(text)` round-trips, invalid item IDs, original query decoding, binary file reads, request logs, password reset, edit/delete confirmation, and saved Arc programs surviving a full restart. An idle signup regression waits 16 seconds before following a login link, then another 32 seconds before submitting the form, covering hibernation and maintenance boundaries.
 
 Run the separate original-runtime comparison suite with:
 

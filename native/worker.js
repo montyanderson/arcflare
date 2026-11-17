@@ -25,7 +25,7 @@ function parseResponse(raw,request){
 }
 
 export class ArcNews extends DurableObject {
-  constructor(ctx,env){super(ctx,env);this.files=new SqlFiles(ctx.storage);this.news=null;this.queue=Promise.resolve();}
+  constructor(ctx,env){super(ctx,env);this.files=new SqlFiles(ctx.storage);this.news=null;this.queue=Promise.resolve();this.maintenanceTimer=null;}
   serial(action){const work=this.queue.then(action);this.queue=work.catch(()=>{});return work;}
   async ready(){
     if(!this.news){this.news=await createNews(this.files,{admins:this.env.ADMIN_USERS});this.files.commit();}
@@ -33,9 +33,17 @@ export class ArcNews extends DurableObject {
   }
   async schedule(news,force=false){
     const delay=await news.nextDelay();
+    clearTimeout(this.maintenanceTimer);this.maintenanceTimer=null;
     if(delay===null){await this.ctx.storage.deleteAlarm();return;}
     const next=Date.now()+delay*1000,current=await this.ctx.storage.getAlarm();
     if(force||current===null||current<=Date.now()||next<current)await this.ctx.storage.setAlarm(next);
+    // An alarm alone allows hibernation after 10 idle seconds, discarding Arc's
+    // form closures. Run maintenance on an in-memory timer too, keeping the VM
+    // resident between jobs. The durable alarm remains the restart fallback.
+    this.maintenanceTimer=setTimeout(()=>{
+      this.maintenanceTimer=null;
+      this.alarm().catch(()=>console.error('Arc background timer failed; durable alarm will retry.'));
+    },delay*1000);
   }
   async fetch(request){
     return this.serial(async()=>{

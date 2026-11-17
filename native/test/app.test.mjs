@@ -52,6 +52,19 @@ test('original closure-based registration creates persistent accounts and admin 
   const admin=await(await get('/newsadmin',alice)).text();assert.match(admin,/kill all by/);
   const denied=await(await get('/newsadmin',bob)).text();assert.ok(!denied.includes('kill all by'));
 });
+test('login links and signup forms survive idle time and background maintenance',async()=>{
+  const home=await(await get()).text();
+  const loginLink=href(home,'login');
+  await new Promise(resolve=>setTimeout(resolve,16000));
+  const login=await(await get(loginLink)).text();
+  const form=forms(login).find(f=>f.html.includes('create account'));
+  assert.ok(form,'login callback must survive the 10-second hibernation window');
+  await new Promise(resolve=>setTimeout(resolve,32000));
+  const response=await post(form,{u:'idle-signup',p:'isolated signup test password'});
+  assert.equal(response.status,302,await response.text());
+  assert.match(response.headers.get('set-cookie')||'',/^user=/,'signup callback must survive maintenance');
+  assert.doesNotMatch(response.headers.get('location')||'',/deadlink/);
+});
 test('original submit form creates a story and resolves its redirect',async()=>{
   const html=await(await get('/submit',alice)).text();const form=forms(html)[0];assert.equal(form.action,'/r');
   const response=await post(form,{t:'Native Arc story 🌍 #(literal)',u:'https://example.com/native',x:''},alice);
