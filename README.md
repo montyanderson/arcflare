@@ -1,4 +1,6 @@
-# Arc News Workers
+# Arcflare
+
+[![Tests](https://github.com/montyanderson/arcflare/actions/workflows/test.yml/badge.svg)](https://github.com/montyanderson/arcflare/actions/workflows/test.yml)
 
 Runs the **official Arc 3.2 `news.arc` source** on Cloudflare Workers. The original application executes in the [Rainbow.js Arc VM](https://github.com/arclanguage/rainbow-js). A SQLite-backed Durable Object supplies persistent files and serializes requests. Runtime code uses Workers APIs and Web Crypto, without a Scheme process, Node compatibility flag, external server, or JavaScript `eval`.
 
@@ -69,6 +71,8 @@ Arc controls the response body, cookies, MIME types, redirects, and cache header
 See Cloudflare's [Durable Object limits](https://developers.cloudflare.com/durable-objects/platform/limits/) and [SQLite storage API](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/) for platform constraints.
 
 ## Verify
+
+[GitHub Actions](https://github.com/montyanderson/arcflare/actions/workflows/test.yml) runs on pushes to `main`, pull requests, and manual dispatch. Separate jobs run source checks and native Worker tests/build, the official Scheme comparison suite, and browser comparisons in Chromium, Firefox, and WebKit. CI uses Ubuntu 24.04, Node.js 26, and pinned pnpm/action versions. Browser reports, screenshots, failure traces, and the Worker bundle are retained as artifacts for 14 days. CI requires no Cloudflare credentials and does not deploy the app.
 
 ```sh
 pnpm check
